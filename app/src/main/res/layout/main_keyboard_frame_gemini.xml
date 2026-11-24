@@ -1,0 +1,3 @@
+<include layout="@layout/gemini_strip" />
+
+    <include layout="@layout/suggestion_strip" />
