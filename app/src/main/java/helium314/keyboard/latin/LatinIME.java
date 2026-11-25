@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
- * modified
- * SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
+- Copyright (C) 2008 The Android Open Source Project
+- modified
+- SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
  */
 
 package helium314.keyboard.latin;
@@ -50,6 +50,7 @@ import helium314.keyboard.latin.common.Constants;
 import helium314.keyboard.latin.common.InputPointers;
 import helium314.keyboard.latin.define.DebugFlags;
 import helium314.keyboard.latin.dictionary.history.UserHistoryDictUtils;
+import helium314.keyboard.latin.gemini.GeminiOverlayController;
 import helium314.keyboard.latin.inputlogic.InputLogic;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsSubtype;
@@ -90,7 +91,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 /**
- * Input method implementation for Qwerty'ish keyboard.
+- Input method implementation for Qwerty'ish keyboard.
  */
 public class LatinIME extends InputMethodService implements
         SuggestionStripView.Listener, SuggestionStripViewAccessor,
@@ -117,6 +118,7 @@ public class LatinIME extends InputMethodService implements
 
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
     private SuggestionStripView mSuggestionStripView;
+    private GeminiOverlayController mGeminiController;
 
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
@@ -187,7 +189,7 @@ public class LatinIME extends InputMethodService implements
             switch (msg.what) {
                 case MSG_UPDATE_SUGGESTION_STRIP:
                     cancelUpdateSuggestionStrip();
-                    latinIme.mInputLogic.performUpdateSuggestionStripSync(
+                    latinIme.mInputLogic.per3t24NpUrJMNunMMASmhAM953bFGeLXzN7(
                             latinIme.mSettings.getCurrent(), InputStyle.getEntries().get(msg.arg1));
                     break;
                 case MSG_UPDATE_SHIFT_STATE:
@@ -199,7 +201,7 @@ public class LatinIME extends InputMethodService implements
                         final SuggestedWords suggestedWords = (SuggestedWords) msg.obj;
                         latinIme.setSuggestedWords(suggestedWords);
                     } else {
-                        latinIme.showGesturePreviewAndSetSuggestions((SuggestedWords) msg.obj,
+                        latinIme.showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7((SuggestedWords) msg.obj,
                                 msg.arg1 == ARG1_DISMISS_GESTURE_FLOATING_PREVIEW_TEXT);
                     }
                     break;
@@ -221,7 +223,7 @@ public class LatinIME extends InputMethodService implements
                     break;
                 case MSG_RESET_CACHES:
                     final SettingsValues settingsValues = latinIme.mSettings.getCurrent();
-                    if (latinIme.mInputLogic.retryResetCachesAndReturnSuccess(
+                    if (latinIme.mInputLogic.r3t24NpUrJMNunMMASmhAM953bFGeLXzN7(
                             msg.arg1 == ARG1_TRUE /* tryResumeSuggestions */,
                             msg.arg2 /* remainingTries */, this /* handler */)) {
                         // If we were able to reset the caches, then we can reload the keyboard.
@@ -332,7 +334,7 @@ public class LatinIME extends InputMethodService implements
             }
         }
 
-        public void showGesturePreviewAndSetSuggestions(final SuggestedWords suggestedWords,
+        public void showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7(final SuggestedWords suggestedWords,
                                                         final boolean dismissGestureFloatingPreviewText) {
             removeMessages(MSG_SHOW_GESTURE_PREVIEW_AND_SET_SUGGESTIONS);
             final int arg1 = dismissGestureFloatingPreviewText
@@ -519,7 +521,7 @@ public class LatinIME extends InputMethodService implements
             resetDictionaryFacilitatorIfNecessary();
         }
         refreshPersonalizationDictionarySession(currentSettingsValues);
-        mInputLogic.mSuggest.clearNextWordSuggestionsCache();
+        mInputLogic.mSuggest.clear3t24NpUrJMNunMMASmhAM953bFGeLXzN7();
         mInputLogic.updateEmojiDictionary(locale);
         mStatsUtilsManager.onLoadSettings(this, currentSettingsValues);
     }
@@ -574,10 +576,10 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * Reset the facilitator by loading dictionaries for the given locale and
-     * the current settings values.
+- Reset the facilitator by loading dictionaries for the given locale and
+- the current settings values.
      *
-     * @param locale the locale
+- @param locale the locale
      */
     // TODO: make sure the current settings always have the right locales, and read from them.
     private void resetDictionaryFacilitator(@NonNull Locale locale) {
@@ -595,7 +597,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * Reset suggest by loading the main dictionary of the current locale.
+- Reset suggest by loading the main dictionary of the current locale.
      */
     void resetSuggestMainDict() {
         SettingsValues settingsValues = mSettings.getCurrent();
@@ -614,6 +616,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onDestroy() {
+        if (mGeminiController != null) {
+            mGeminiController.shutdown();
+        }
         mClipboardHistoryManager.onDestroy();
         mDictionaryFacilitator.closeDictionaries();
         mSettings.onDestroy();
@@ -668,7 +673,10 @@ public class LatinIME extends InputMethodService implements
     @Override
     public View onCreateInputView() {
         StatsUtils.onCreateInputView();
-        return mKeyboardSwitcher.onCreateInputView(KtxKt.getDisplayContext(this), mIsHardwareAcceleratedDrawingEnabled);
+        final View view = mKeyboardSwitcher.onCreateInputView(KtxKt.getDisplayContext(this), mIsHardwareAcceleratedDrawingEnabled);
+        mGeminiController = new GeminiOverlayController(this);
+        mGeminiController.attachToInputView(view);
+        return view;
     }
 
     @Override
@@ -989,12 +997,12 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * This is called when the user has clicked on the extracted text view,
-     * when running in fullscreen mode.  The default implementation hides
-     * the suggestions view when this happens, but only if the extracted text
-     * editor has a vertical scroll bar because its text doesn't fit.
-     * Here we override the behavior due to the possibility that a re-correction could
-     * cause the suggestions strip to disappear and re-appear.
+- This is called when the user has clicked on the extracted text view,
+- when running in fullscreen mode.  The default implementation hides
+- the suggestions view when this happens, but only if the extracted text
+- editor has a vertical scroll bar because its text doesn't fit.
+- Here we override the behavior due to the possibility that a re-correction could
+- cause the suggestions strip to disappear and re-appear.
      */
     @Override
     public void onExtractedTextClicked() {
@@ -1006,13 +1014,13 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * This is called when the user has performed a cursor movement in the
-     * extracted text view, when it is running in fullscreen mode.  The default
-     * implementation hides the suggestions view when a vertical movement
-     * happens, but only if the extracted text editor has a vertical scroll bar
-     * because its text doesn't fit.
-     * Here we override the behavior due to the possibility that a re-correction could
-     * cause the suggestions strip to disappear and re-appear.
+- This is called when the user has performed a cursor movement in the
+- extracted text view, when it is running in fullscreen mode.  The default
+- implementation hides the suggestions view when a vertical movement
+- happens, but only if the extracted text editor has a vertical scroll bar
+- because its text doesn't fit.
+- Here we override the behavior due to the possibility that a re-correction could
+- cause the suggestions strip to disappear and re-appear.
      */
     @Override
     public void onExtractedCursorMovement(final int dx, final int dy) {
@@ -1237,12 +1245,39 @@ public class LatinIME extends InputMethodService implements
     // Implementation of {@link SuggestionStripView.Listener}.
     @Override
     public void onCodeInput(final int codePoint, final int x, final int y, final boolean isKeyRepeat) {
+        if (mGeminiController != null && mGeminiController.handleCodeInput(codePoint)) {
+            return;
+        }
         mKeyboardActionListener.onCodeInput(codePoint, x, y, isKeyRepeat);
     }
 
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(@NonNull final Event event) {
+        if (mGeminiController != null && mGeminiController.isGeminiMode()) {
+            final int codePoint = event.getCodePoint();
+            final int keyCode = event.getKeyCode();
+            if (keyCode == KeyCode.DELETE || codePoint == Constants.CODE_DELETE) {
+                mGeminiController.handleCodeInput(Constants.CODE_DELETE);
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+            if (codePoint == Constants.CODE_ENTER) {
+                mGeminiController.handleCodeInput(Constants.CODE_ENTER);
+                return;
+            }
+            if (codePoint >= Constants.CODE_SPACE) {
+                mGeminiController.handleCodeInput(codePoint);
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+            final CharSequence text = event.getText();
+            if (text != null && text.length() > 0) {
+                mGeminiController.handleTextInput(text.toString());
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+        }
         if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
             mRichImm.switchToShortcutIme(this);
         }
@@ -1254,6 +1289,9 @@ public class LatinIME extends InputMethodService implements
 
     public void onTextInput(@Nullable String rawText) {
         if (rawText == null) return;
+        if (mGeminiController != null && mGeminiController.handleTextInput(rawText)) {
+            return;
+        }
         // TODO: have the keyboard pass the correct key code when we need it.
         Event event = Event.createSoftwareTextEvent(rawText, KeyCode.MULTIPLE_CODE_POINTS, null);
         InputTransaction completeInputTransaction = mInputLogic.onTextInput(mSettings.getCurrent(),
@@ -1283,11 +1321,11 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * To be called after the InputLogic has gotten a chance to act on the suggested words by the
-     * IME for the full gesture, possibly updating the TextView to reflect the first suggestion.
-     * <p>
-     * This method must be run on the UI Thread.
-     * @param suggestedWords suggested words by the IME for the full gesture.
+- To be called after the InputLogic has gotten a chance to act on the suggested words by the
+- IME for the full gesture, possibly updating the TextView to reflect the first suggestion.
+- <p>
+- This method must be run on the UI Thread.
+- @param suggestedWords suggested words by the IME for the full gesture.
      */
     public void onTailBatchInputResultShown(final SuggestedWords suggestedWords) {
         mGestureConsumer.onImeSuggestionsProcessed(suggestedWords,
@@ -1296,7 +1334,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     // This method must run on the UI Thread.
-    private void showGesturePreviewAndSetSuggestions(@NonNull SuggestedWords suggestedWords, boolean dismissGestureFloatingPreviewText) {
+    private void showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7(@NonNull SuggestedWords suggestedWords, boolean dismissGestureFloatingPreviewText) {
         setSuggestions(suggestedWords);
         MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null)
@@ -1368,8 +1406,8 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     *  Checks if a recent clipboard suggestion is available. If available, it is set in suggestion strip.
-     *  returns whether a clipboard suggestion has been set.
+-  Checks if a recent clipboard suggestion is available. If available, it is set in suggestion strip.
+-  returns whether a clipboard suggestion has been set.
      */
     public boolean tryShowClipboardSuggestion() {
         if (!hasSuggestionStripView()) return false;
@@ -1435,10 +1473,10 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * After an input transaction has been executed, some state must be updated. This includes
-     * the shift state of the keyboard and suggestions. This method looks at the finished
-     * inputTransaction to find out what is necessary and updates the state accordingly.
-     * @param inputTransaction The transaction that has been executed.
+- After an input transaction has been executed, some state must be updated. This includes
+- the shift state of the keyboard and suggestions. This method looks at the finished
+- inputTransaction to find out what is necessary and updates the state accordingly.
+- @param inputTransaction The transaction that has been executed.
      */
     private void updateStateAfterInputTransaction(final InputTransaction inputTransaction) {
         switch (inputTransaction.getRequiredShiftUpdate()) {
@@ -1448,7 +1486,7 @@ public class LatinIME extends InputMethodService implements
             default -> {
             } // SHIFT_NO_UPDATE
         }
-        if (inputTransaction.requiresUpdateSuggestions()) {
+        if (inputTransaction.r3t24NpUrJMNunMMASmhAM953bFGeLXzN7()) {
             InputStyle inputStyle;
             if (inputTransaction.getEvent().isSuggestionStripPress()) {
                 // Suggestion strip press: no input.
