@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants
 import java.util.concurrent.Executors
@@ -71,7 +72,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         if (!isGeminiMode) return false
 
         return when {
-            primaryCode == Constants.CODE_DELETE -> {
+            primaryCode == KeyCode.DELETE -> {
                 if (!isLoading && promptBuffer.isNotEmpty()) {
                     promptBuffer.deleteCharAt(promptBuffer.length - 1)
                     refreshPromptText()
@@ -82,14 +83,14 @@ class GeminiOverlayController(private val ime: InputMethodService) {
                 submitPrompt()
                 true
             }
-            primaryCode >= Constants.CODE_SPACE -> {
+            primaryCode >= 32 -> {
                 if (!isLoading) {
                     promptBuffer.append(String(Character.toChars(primaryCode)))
                     refreshPromptText()
                 }
                 true
             }
-            else -> false // Biarkan Shift, ?123, dll. diproses HeliBoard secara normal
+            else -> false
         }
     }
 
