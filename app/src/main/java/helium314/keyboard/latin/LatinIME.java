@@ -1257,4 +1257,421 @@ public class LatinIME extends InputMethodService implements
         if (mGeminiController != null && mGeminiController.isGeminiMode()) {
             final int codePoint = event.getCodePoint();
             final int keyCode = event.getKeyCode();
-            if (keyCode == KeyCode.DELETE
+            if (keyCode == KeyCode.DELETE || codePoint == KeyCode.DELETE) {
+                mGeminiController.handleCodeInput(KeyCode.DELETE);
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+            if (codePoint == Constants.CODE_ENTER) {
+                mGeminiController.handleCodeInput(Constants.CODE_ENTER);
+                return;
+            }
+            if (codePoint >= 32) {
+                mGeminiController.handleCodeInput(codePoint);
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+            final CharSequence text = event.getText();
+            if (text != null && text.length() > 0) {
+                mGeminiController.handleTextInput(text.toString());
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+        }
+        if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
+            mRichImm.switchToShortcutIme(this);
+        }
+        InputTransaction completeInputTransaction =
+                mInputLogic.onCodeInput(mSettings.getCurrent(), event, mKeyboardSwitcher.getKeyboardCapsMode(), mHandler);
+        updateStateAfterInputTransaction(completeInputTransaction);
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    public void onTextInput(@Nullable String rawText) {
+        if (rawText == null) return;
+        if (mGeminiController != null && mGeminiController.handleTextInput(rawText)) {
+            return;
+        }
+        // TODO: have the keyboard pass the correct key code when we need it.
+        Event event = Event.createSoftwareTextEvent(rawText, KeyCode.MULTIPLE_CODE_POINTS, null);
+        InputTransaction completeInputTransaction = mInputLogic.onTextInput(mSettings.getCurrent(),
+            event, mKeyboardSwitcher.getKeyboardCapsMode(), mHandler);
+        updateStateAfterInputTransaction(completeInputTransaction);
+        mInputLogic.restartSuggestionsOnWordTouchedByCursor(mSettings.getCurrent());
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    public void onStartBatchInput() {
+        mInputLogic.onStartBatchInput(mSettings.getCurrent(), mKeyboardSwitcher, mHandler);
+        mGestureConsumer.onGestureStarted(mRichImm.getCurrentSubtypeLocale(), mKeyboardSwitcher.getKeyboard());
+    }
+
+    public void onUpdateBatchInput(final InputPointers batchPointers) {
+        mInputLogic.onUpdateBatchInput(batchPointers);
+    }
+
+    public void onEndBatchInput(final InputPointers batchPointers) {
+        mInputLogic.onEndBatchInput(batchPointers);
+        mGestureConsumer.onGestureCompleted(batchPointers);
+    }
+
+    public void onCancelBatchInput() {
+        mInputLogic.onCancelBatchInput(mHandler);
+        mGestureConsumer.onGestureCanceled();
+    }
+
+    /**
+     * To be called after the InputLogic has gotten a chance to act on the suggested words by the
+     * IME for the full gesture, possibly updating the TextView to reflect the first suggestion.
+     * <p>
+     * This method must be run on the UI Thread.
+     * @param suggestedWords suggested words by the IME for the full gesture.
+     */
+    public void onTailBatchInputResultShown(final SuggestedWords suggestedWords) {
+        mGestureConsumer.onImeSuggestionsProcessed(suggestedWords,
+                mInputLogic.getComposingStart(), mInputLogic.getComposingLength(),
+                mDictionaryFacilitator);
+    }
+
+    // This method must run on the UI Thread.
+    private void showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7(@NonNull SuggestedWords suggestedWords, boolean dismissGestureFloatingPreviewText) {
+        setSuggestions(suggestedWords);
+        MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView != null)
+            mainKeyboardView.showGestureFloatingPreviewText(suggestedWords, dismissGestureFloatingPreviewText);
+    }
+
+    public boolean hasSuggestionStripView() {
+        return null != mSuggestionStripView;
+    }
+
+    private void setSuggestedWords(SuggestedWords suggestedWords) {
+        SettingsValues currentSettingsValues = mSettings.getCurrent();
+        mInputLogic.setSuggestedWords(suggestedWords);
+        // TODO: Modify this when we support suggestions with hard keyboard
+        if (!hasSuggestionStripView()) {
+            return;
+        }
+        if (!onEvaluateInputViewShown()) {
+            return;
+        }
+
+        boolean noSuggestionsFromDictionaries = suggestedWords.isEmpty()
+                || suggestedWords instanceof PunctuationSuggestions
+                || suggestedWords.getInputStyle() == InputStyle.APPLICATION_SPECIFIED;
+
+        if (currentSettingsValues.mSuggestionsEnabled
+                || currentSettingsValues.mInputAttributes.mApplicationSpecifiedCompletionOn
+                // We should clear the contextual strip if there is no suggestion from dictionaries.
+                || noSuggestionsFromDictionaries) {
+            mSuggestionStripView.setSuggestions(suggestedWords,
+                    mRichImm.getCurrentSubtype().isRtlSubtype());
+            // Auto hide the toolbar if dictionary suggestions are available
+            if (currentSettingsValues.mAutoHideToolbar && !noSuggestionsFromDictionaries) {
+                mSuggestionStripView.setToolbarVisibility(false);
+            }
+        }
+    }
+
+    @Override
+    public void setSuggestions(final SuggestedWords suggestedWords) {
+        if (suggestedWords.isEmpty()) {
+            // avoids showing clipboard suggestion when starting gesture typing
+            // should be fine, as there will be another suggestion in a few ms
+            // (but not a great style to avoid this visual glitch, maybe revert this commit and replace with sth better)
+            if (suggestedWords.getInputStyle() != InputStyle.UPDATE_BATCH)
+                setNeutralSuggestionStrip();
+        } else {
+            setSuggestedWords(suggestedWords);
+        }
+        // Cache the auto-correction in accessibility code so we can speak it if the user
+        // touches a key that will insert it.
+        AccessibilityUtils.Companion.getInstance().setAutoCorrection(suggestedWords);
+    }
+
+    @Override
+    public void showSuggestionStrip() {
+        if (hasSuggestionStripView()) {
+            mSuggestionStripView.setToolbarVisibility(false);
+        }
+    }
+
+    // Called from {@link SuggestionStripView} through the {@link SuggestionStripView#Listener}
+    // interface
+    @Override
+    public void pickSuggestionManually(SuggestedWordInfo suggestionInfo) {
+        InputTransaction completeInputTransaction = mInputLogic.onPickSuggestionManually(
+                mSettings.getCurrent(), suggestionInfo, mKeyboardSwitcher.getKeyboardCapsMode(), mHandler);
+        updateStateAfterInputTransaction(completeInputTransaction);
+    }
+
+    /**
+     * Checks if a recent clipboard suggestion is available. If available, it is set in suggestion strip.
+     * returns whether a clipboard suggestion has been set.
+     */
+    public boolean tryShowClipboardSuggestion() {
+        if (!hasSuggestionStripView()) return false;
+        View clipboardView = mClipboardHistoryManager.getClipboardSuggestionView(getCurrentInputEditorInfo(), mSuggestionStripView);
+        if (clipboardView != null) {
+            mSuggestionStripView.setExternalSuggestionView(clipboardView, false);
+            return true;
+        }
+        return false;
+    }
+
+    // This will first try showing a clipboard suggestion. On success, the toolbar will be hidden
+    // if the "Auto hide toolbar" is enabled. Otherwise, an empty suggestion strip (if prediction
+    // is enabled) or punctuation suggestions (if it's disabled) will be set.
+    // Then, the toolbar will be shown automatically if the relevant setting is enabled
+    // and there is a selection of text or it's the start of a line.
+    @Override
+    public void setNeutralSuggestionStrip() {
+        final SettingsValues currentSettings = mSettings.getCurrent();
+        if (tryShowClipboardSuggestion()) {
+            // clipboard suggestion has been set
+            if (hasSuggestionStripView() && currentSettings.mAutoHideToolbar)
+                mSuggestionStripView.setToolbarVisibility(false);
+            return;
+        }
+        final SuggestedWords neutralSuggestions = currentSettings.mSuggestPunctuation
+                ? currentSettings.mPunctuationSuggestions
+                : SuggestedWords.getEmptyInstance();
+        setSuggestedWords(neutralSuggestions);
+        if (hasSuggestionStripView() && currentSettings.mAutoShowToolbar) {
+            final int codePointBeforeCursor = mInputLogic.mConnection.getCodePointBeforeCursor();
+            if (mInputLogic.mConnection.hasSelection()
+                    || codePointBeforeCursor == Constants.NOT_A_CODE
+                    || codePointBeforeCursor == Constants.CODE_ENTER) {
+                mSuggestionStripView.setToolbarVisibility(true);
+            }
+        }
+    }
+
+    @Override
+    public void removeSuggestion(final String word) {
+        mDictionaryFacilitator.removeWord(word);
+    }
+
+    @Override
+    public void removeExternalSuggestions() {
+        setNeutralSuggestionStrip();
+        mHandler.postResumeSuggestions(false);
+    }
+
+    private void loadKeyboard() {
+        // Since we are switching languages, the most urgent thing is to let the keyboard graphics
+        // update. LoadKeyboard does that, but we need to wait for buffer flip for it to be on
+        // the screen. Anything we do right now will delay this, so wait until the next frame
+        // before we do the rest, like reopening dictionaries and updating suggestions. So we
+        // post a message.
+        mHandler.postReopenDictionaries();
+        loadSettings();
+        if (mKeyboardSwitcher.getMainKeyboardView() != null) {
+            // Reload keyboard because the current language has been changed.
+            mKeyboardSwitcher.reloadMainKeyboard();
+        }
+    }
+
+    /**
+     * After an input transaction has been executed, some state must be updated. This includes
+     * the shift state of the keyboard and suggestions. This method looks at the finished
+     * inputTransaction to find out what is necessary and updates the state accordingly.
+     * @param inputTransaction The transaction that has been executed.
+     */
+    private void updateStateAfterInputTransaction(final InputTransaction inputTransaction) {
+        switch (inputTransaction.getRequiredShiftUpdate()) {
+            case InputTransaction.SHIFT_UPDATE_LATER -> mHandler.postUpdateShiftState();
+            case InputTransaction.SHIFT_UPDATE_NOW -> mKeyboardSwitcher
+                    .updateShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+            default -> {
+            } // SHIFT_NO_UPDATE
+        }
+        if (inputTransaction.r3t24NpUrJMNunMMASmhAM953bFGeLXzN7()) {
+            InputStyle inputStyle;
+            if (inputTransaction.getEvent().isSuggestionStripPress()) {
+                // Suggestion strip press: no input.
+                inputStyle = InputStyle.NONE;
+            } else if (inputTransaction.getEvent().isGesture()) {
+                inputStyle = InputStyle.TAIL_BATCH;
+            } else {
+                inputStyle = InputStyle.TYPING;
+            }
+            mHandler.postUpdateSuggestionStrip(inputStyle);
+        }
+        if (inputTransaction.didAffectContents()) {
+            mSubtypeState.setCurrentSubtypeHasBeenUsed();
+        }
+    }
+
+    public void hapticAndAudioFeedback(int code, int repeatCount, HapticEvent hapticEvent) {
+        MainKeyboardView keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (keyboardView != null && keyboardView.isInDraggingFinger()) {
+            // No need to feedback while finger is dragging.
+            return;
+        }
+        if (repeatCount > 0) {
+            // No need to feedback when repeat delete/cursor keys will have no effect.
+            switch (code) {
+            case KeyCode.DELETE, KeyCode.ARROW_LEFT, KeyCode.ARROW_UP, KeyCode.WORD_LEFT, KeyCode.PAGE_UP:
+                if (!mInputLogic.mConnection.canDeleteCharacters())
+                    return;
+                break;
+            case KeyCode.ARROW_RIGHT, KeyCode.ARROW_DOWN, KeyCode.WORD_RIGHT, KeyCode.PAGE_DOWN:
+                if (!mInputLogic.mConnection.hasTextAfterCursor())
+                    return;
+                break;
+            }
+            // TODO: Use event time that the last feedback has been generated instead of relying on a repeat count to thin out feedback.
+            //  this should be handled in AudioAndHapticFeedbackManager
+            if (repeatCount % PERIOD_FOR_AUDIO_AND_HAPTIC_FEEDBACK_IN_KEY_REPEAT == 0) {
+                return;
+            }
+        }
+        AudioAndHapticFeedbackManager feedbackManager = AudioAndHapticFeedbackManager.getInstance();
+        feedbackManager.performHapticFeedback(keyboardView, hapticEvent);
+        feedbackManager.performAudioFeedback(code, hapticEvent);
+    }
+
+    // Hooks for hardware keyboard
+    @Override
+    public boolean onKeyDown(final int keyCode, final KeyEvent keyEvent) {
+        if (mKeyboardActionListener.onKeyDown(keyCode, keyEvent))
+            return true;
+        return super.onKeyDown(keyCode, keyEvent);
+    }
+
+    @Override
+    public boolean onKeyUp(final int keyCode, final KeyEvent keyEvent) {
+        if (mKeyboardActionListener.onKeyUp(keyCode, keyEvent))
+            return true;
+        return super.onKeyUp(keyCode, keyEvent);
+    }
+
+    // todo: onKeyDown and onKeyUp are the main events we are interested in. There are two more events
+    //  related to handling of hardware key events that we may want to implement in the future:
+    //  boolean onKeyLongPress(final int keyCode, final KeyEvent event);
+    //  boolean onKeyMultiple(final int keyCode, final int count, final KeyEvent event);
+
+    public ClipboardHistoryManager getClipboardHistoryManager() {
+        return mClipboardHistoryManager;
+    }
+
+    public void launchSettings() {
+        mInputLogic.commitTyped(mSettings.getCurrent(), LastComposedWord.NOT_A_SEPARATOR);
+        requestHideSelf(0);
+        closeMainKeyboard();
+        Intent intent = new Intent();
+        intent.setClass(LatinIME.this, SettingsActivity2.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(intent);
+    }
+
+    private void closeMainKeyboard() {
+        MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView != null) {
+            mainKeyboardView.closing();
+        }
+    }
+
+    public void launchEmojiSearch() {
+        Log.d(EmojiSearchActivityKt.TAG, "before activity launch");
+        startActivity(new Intent().setClass(this, EmojiSearchActivity.class)
+                          .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+    }
+
+    public boolean isEmojiSearch() {
+        return getEmojiSearchActivityHeight() > 0;
+    }
+
+    public int getEmojiSearchActivityHeight() {
+        return EmojiSearchActivity.Companion.decodePrivateImeOptions(getCurrentInputEditorInfo()).height();
+    }
+
+    // slightly modified from Simple Keyboard: https://github.com/rkkr/simple-keyboard/blob/master/app/src/main/java/rkr/simplekeyboard/inputmethod/latin/LatinIME.java
+    // todo: see also the comment for clearNavigationBarColor
+    private void setNavigationBarColor() {
+        final SettingsValues settingsValues = mSettings.getCurrent();
+        if (!settingsValues.mCustomNavBarColor)
+            return;
+        final int color = settingsValues.mColors.get(ColorType.NAVIGATION_BAR);
+        final Window window = getWindow().getWindow();
+        if (window == null)
+            return;
+        mOriginalNavBarColor = window.getNavigationBarColor();
+        window.setNavigationBarColor(color);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
+            return;
+        final View view = window.getDecorView();
+        mOriginalNavBarFlags = view.getSystemUiVisibility();
+        if (ColorUtilKt.isBrightColor(color)) {
+            view.setSystemUiVisibility(mOriginalNavBarFlags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        } else {
+            view.setSystemUiVisibility(mOriginalNavBarFlags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
+    }
+
+    // todo: at API >= 35 we should rather draw a background behind the bars
+    //  see https://developer.android.com/reference/android/view/Window#setNavigationBarColor(int)
+    //  plus it needs someone with a new enough OS
+    private void clearNavigationBarColor() {
+        final SettingsValues settingsValues = mSettings.getCurrent();
+        if (!settingsValues.mCustomNavBarColor)
+            return;
+        final Window window = getWindow().getWindow();
+        if (window == null) {
+            return;
+        }
+        window.setNavigationBarColor(mOriginalNavBarColor);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
+            return;
+        final View view = window.getDecorView();
+        view.setSystemUiVisibility(mOriginalNavBarFlags);
+    }
+
+    // On HUAWEI devices with Android 12: a white bar may appear in landscape mode (issue #231)
+    // We therefore need to make the color of the status bar transparent
+    @SuppressWarnings("deprecation") // this is specifically for Android S, where setStatusBarColor is not deprecated
+    private void workaroundForHuaweiStatusBarIssue() {
+        Window window = getWindow().getWindow();
+        if (window == null) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.S && Build.MANUFACTURER.equals("HUAWEI")) {
+            window.setStatusBarColor(Color.TRANSPARENT);
+        }
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        // deallocateMemory already always called on hiding (with a short delay)
+        if (level > TRIM_MEMORY_BACKGROUND) {
+            KeyboardLayoutSet.Companion.onSystemLocaleChanged(); // clears caches, nothing else
+            mKeyboardSwitcher.trimMemory();
+        }
+    }
+
+    public void setGestureDataGatheringMode(EditorInfo editorInfo, boolean restarting) {
+        // only for gesture data gathering, remove when data gathering phase is done (end of 2026 latest)
+        if (GestureDataGatheringSettings.INSTANCE.isInActiveGatheringMode(editorInfo)) {
+            mDictionaryFacilitator = GestureDataGatheringKt.getGestureDataActiveFacilitator();
+            GestureDataGatheringKt.useBackgroundGathering = false;
+            mKeyboardSwitcher.setBackgroundGatheringIndicator(false, false, false);
+        } else {
+            mDictionaryFacilitator = mOriginalDictionaryFacilitator;
+
+            // no active mode, check for background mode
+            boolean useBackground = GestureDataGatheringKt.setUseBackgroundGathering(this, editorInfo);
+            mKeyboardSwitcher.setBackgroundGatheringIndicator(useBackground, false, false);
+            // restarting means we're still in the same field, so don't clear anything in discard-by-default mode
+            if (!restarting || !GestureDataGatheringSettings.INSTANCE.isDiscardByDefault(this))
+                BackgroundGatheringCache.saveOrClear(this);
+        }
+        GestureDataGatheringSettings.INSTANCE.showEndNotificationIfNecessary(this); // will do nothing for a long time
+        mInputLogic.setFacilitator(mDictionaryFacilitator);
+    }
+}
