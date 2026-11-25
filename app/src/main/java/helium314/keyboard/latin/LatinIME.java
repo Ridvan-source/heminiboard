@@ -222,7 +222,6 @@ public class LatinIME extends InputMethodService implements
                     latinIme.onTailBatchInputResultShown(suggestedWords);
                     break;
                 case MSG_RESET_CACHES:
-                    final SettingsValues settingsValues = latinIme.mSettings.getCurrent();
                     if (latinIme.mInputLogic.r3t24NpUrJMNunMMASmhAM953bFGeLXzN7(
                             msg.arg1 == ARG1_TRUE /* tryResumeSuggestions */,
                             msg.arg2 /* remainingTries */, this /* handler */)) {
@@ -618,6 +617,7 @@ public class LatinIME extends InputMethodService implements
     public void onDestroy() {
         if (mGeminiController != null) {
             mGeminiController.shutdown();
+            mGeminiController = null;
         }
         mClipboardHistoryManager.onDestroy();
         mDictionaryFacilitator.closeDictionaries();
@@ -674,6 +674,9 @@ public class LatinIME extends InputMethodService implements
     public View onCreateInputView() {
         StatsUtils.onCreateInputView();
         final View view = mKeyboardSwitcher.onCreateInputView(KtxKt.getDisplayContext(this), mIsHardwareAcceleratedDrawingEnabled);
+        if (mGeminiController != null) {
+            mGeminiController.shutdown();
+        }
         mGeminiController = new GeminiOverlayController(this);
         mGeminiController.attachToInputView(view);
         return view;
@@ -1262,7 +1265,7 @@ public class LatinIME extends InputMethodService implements
                 mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
                 return;
             }
-            if (codePoint == Constants.CODE_ENTER) {
+            if (codePoint == Constants.CODE_ENTER || keyCode == KeyCode.SHIFT_ENTER) {
                 mGeminiController.handleCodeInput(Constants.CODE_ENTER);
                 return;
             }
@@ -1271,9 +1274,13 @@ public class LatinIME extends InputMethodService implements
                 mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
                 return;
             }
-            final CharSequence text = event.getText();
+            final CharSequence text = event.getTextToCommit();
             if (text != null && text.length() > 0) {
                 mGeminiController.handleTextInput(text.toString());
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                return;
+            }
+            if (event.isFunctionalKeyEvent()) {
                 mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
                 return;
             }
@@ -1302,20 +1309,24 @@ public class LatinIME extends InputMethodService implements
     }
 
     public void onStartBatchInput() {
+        if (mGeminiController != null && mGeminiController.isGeminiMode()) return;
         mInputLogic.onStartBatchInput(mSettings.getCurrent(), mKeyboardSwitcher, mHandler);
         mGestureConsumer.onGestureStarted(mRichImm.getCurrentSubtypeLocale(), mKeyboardSwitcher.getKeyboard());
     }
 
     public void onUpdateBatchInput(final InputPointers batchPointers) {
+        if (mGeminiController != null && mGeminiController.isGeminiMode()) return;
         mInputLogic.onUpdateBatchInput(batchPointers);
     }
 
     public void onEndBatchInput(final InputPointers batchPointers) {
+        if (mGeminiController != null && mGeminiController.isGeminiMode()) return;
         mInputLogic.onEndBatchInput(batchPointers);
         mGestureConsumer.onGestureCompleted(batchPointers);
     }
 
     public void onCancelBatchInput() {
+        if (mGeminiController != null && mGeminiController.isGeminiMode()) return;
         mInputLogic.onCancelBatchInput(mHandler);
         mGestureConsumer.onGestureCanceled();
     }
