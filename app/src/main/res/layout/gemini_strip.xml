@@ -6,16 +6,38 @@
     android:orientation="vertical"
     android:paddingStart="6dp"
     android:paddingEnd="6dp"
-    android:paddingTop="4dp"
+    android:paddingTop="3dp"
     android:paddingBottom="2dp">
 
-    <!-- Baris Normal: Tombol Tanya Gemini + Pintasan Cepat -->
+    <!-- Mode Ringkas (Tersembunyi): hanya tombol mungil untuk memunculkan lagi -->
+    <LinearLayout
+        android:id="@+id/gemini_collapsed_bar"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:gravity="end|center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/btn_gemini_expand"
+            android:layout_width="wrap_content"
+            android:layout_height="18dp"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="✨ ▴"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Mode Normal: Tanya Gemini + Pintasan Cepat + Tombol Sembunyikan -->
     <LinearLayout
         android:id="@+id/gemini_idle_bar"
         android:layout_width="match_parent"
         android:layout_height="34dp"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:visibility="visible">
 
         <TextView
             android:id="@+id/btn_gemini_open"
@@ -56,21 +78,22 @@
             android:layout_weight="1" />
 
         <TextView
-            android:id="@+id/btn_gemini_key"
-            android:layout_width="30dp"
+            android:id="@+id/btn_gemini_collapse"
+            android:layout_width="28dp"
             android:layout_height="28dp"
             android:gravity="center"
-            android:text="🔑"
-            android:textSize="13sp" />
+            android:text="▾"
+            android:textSize="14sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Panel Aktif Saat Mengetik Pertanyaan ke Gemini -->
+    <!-- Mode Aktif: Mengetik Prompt untuk Gemini -->
     <LinearLayout
         android:id="@+id/gemini_active_panel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="38dp"
         android:gravity="center_vertical"
-        android:minHeight="40dp"
         android:orientation="horizontal"
         android:paddingStart="10dp"
         android:paddingEnd="6dp"
@@ -83,20 +106,19 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="2"
+            android:ellipsize="start"
+            android:maxLines="3"
             android:text="Ketik pertanyaan untuk Gemini..."
             android:textSize="12sp" />
 
         <TextView
             android:id="@+id/btn_gemini_grab"
-            android:layout_width="wrap_content"
+            android:layout_width="28dp"
             android:layout_height="28dp"
             android:layout_marginStart="4dp"
             android:gravity="center"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:text="Ambil Teks"
-            android:textSize="11sp" />
+            android:text="📋"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/btn_gemini_send"
@@ -117,7 +139,8 @@
             android:layout_marginStart="2dp"
             android:gravity="center"
             android:text="✕"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
 </LinearLayout>
