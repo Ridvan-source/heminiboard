@@ -189,7 +189,7 @@ public class LatinIME extends InputMethodService implements
             switch (msg.what) {
                 case MSG_UPDATE_SUGGESTION_STRIP:
                     cancelUpdateSuggestionStrip();
-                    latinIme.mInputLogic.per3t24NpUrJMNunMMASmhAM953bFGeLXzN7(
+                    latinIme.mInputLogic.performUpdateSuggestionStripSync(
                             latinIme.mSettings.getCurrent(), InputStyle.getEntries().get(msg.arg1));
                     break;
                 case MSG_UPDATE_SHIFT_STATE:
@@ -201,7 +201,7 @@ public class LatinIME extends InputMethodService implements
                         final SuggestedWords suggestedWords = (SuggestedWords) msg.obj;
                         latinIme.setSuggestedWords(suggestedWords);
                     } else {
-                        latinIme.showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7((SuggestedWords) msg.obj,
+                        latinIme.showGesturePreviewAndSetSuggestions((SuggestedWords) msg.obj,
                                 msg.arg1 == ARG1_DISMISS_GESTURE_FLOATING_PREVIEW_TEXT);
                     }
                     break;
@@ -222,7 +222,7 @@ public class LatinIME extends InputMethodService implements
                     latinIme.onTailBatchInputResultShown(suggestedWords);
                     break;
                 case MSG_RESET_CACHES:
-                    if (latinIme.mInputLogic.r3t24NpUrJMNunMMASmhAM953bFGeLXzN7(
+                    if (latinIme.mInputLogic.retryResetCachesAndReturnSuccess(
                             msg.arg1 == ARG1_TRUE /* tryResumeSuggestions */,
                             msg.arg2 /* remainingTries */, this /* handler */)) {
                         // If we were able to reset the caches, then we can reload the keyboard.
@@ -333,7 +333,7 @@ public class LatinIME extends InputMethodService implements
             }
         }
 
-        public void showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7(final SuggestedWords suggestedWords,
+        public void showGesturePreviewAndSetSuggestions(final SuggestedWords suggestedWords,
                                                         final boolean dismissGestureFloatingPreviewText) {
             removeMessages(MSG_SHOW_GESTURE_PREVIEW_AND_SET_SUGGESTIONS);
             final int arg1 = dismissGestureFloatingPreviewText
@@ -520,7 +520,7 @@ public class LatinIME extends InputMethodService implements
             resetDictionaryFacilitatorIfNecessary();
         }
         refreshPersonalizationDictionarySession(currentSettingsValues);
-        mInputLogic.mSuggest.clear3t24NpUrJMNunMMASmhAM953bFGeLXzN7();
+        mInputLogic.mSuggest.clearNextWordSuggestionsCache();
         mInputLogic.updateEmojiDictionary(locale);
         mStatsUtilsManager.onLoadSettings(this, currentSettingsValues);
     }
@@ -1345,7 +1345,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     // This method must run on the UI Thread.
-    private void showGestur3t24NpUrJMNunMMASmhAM953bFGeLXzN7(@NonNull SuggestedWords suggestedWords, boolean dismissGestureFloatingPreviewText) {
+    private void showGesturePreviewAndSetSuggestions(@NonNull SuggestedWords suggestedWords, boolean dismissGestureFloatingPreviewText) {
         setSuggestions(suggestedWords);
         MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null)
@@ -1497,7 +1497,7 @@ public class LatinIME extends InputMethodService implements
             default -> {
             } // SHIFT_NO_UPDATE
         }
-        if (inputTransaction.r3t24NpUrJMNunMMASmhAM953bFGeLXzN7()) {
+        if (inputTransaction.requiresUpdateSuggestions()) {
             InputStyle inputStyle;
             if (inputTransaction.getEvent().isSuggestionStripPress()) {
                 // Suggestion strip press: no input.
