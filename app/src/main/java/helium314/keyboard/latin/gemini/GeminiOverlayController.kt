@@ -1,6 +1,5 @@
 package helium314.keyboard.latin.gemini
 
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
@@ -21,47 +20,57 @@ import java.util.concurrent.Executors
 
 class GeminiOverlayController(private val ime: InputMethodService) {
 
+    companion object {
+        const val PREFS_NAME = "gemini_heliboard"
+        const val KEY_API_KEY = "api_key"
+        const val KEY_IS_COLLAPSED = "is_collapsed"
+    }
+
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val promptBuffer = StringBuilder()
-    private val apiKeyRegex = Regex("AIza[0-9A-Za-z_\\-]{20,}")
 
     var isGeminiMode: Boolean = false
         private set
 
     private var isLoading: Boolean = false
+    private var stripRoot: View? = null
+    private var collapsedBar: LinearLayout? = null
     private var idleBar: LinearLayout? = null
     private var activePanel: LinearLayout? = null
     private var tvPrompt: TextView? = null
     private var suggestionStrip: View? = null
 
     fun attachToInputView(rootView: View) {
-        val stripRoot = rootView.findViewById<View>(R.id.gemini_strip_root)
+        stripRoot = rootView.findViewById(R.id.gemini_strip_root)
+        collapsedBar = rootView.findViewById(R.id.gemini_collapsed_bar)
         idleBar = rootView.findViewById(R.id.gemini_idle_bar)
         activePanel = rootView.findViewById(R.id.gemini_active_panel)
         tvPrompt = rootView.findViewById(R.id.tv_gemini_prompt)
         suggestionStrip = rootView.findViewById(R.id.suggestion_strip_view)
 
+        val btnExpand = rootView.findViewById<TextView>(R.id.btn_gemini_expand)
+        val btnCollapse = rootView.findViewById<TextView>(R.id.btn_gemini_collapse)
         val btnOpen = rootView.findViewById<TextView>(R.id.btn_gemini_open)
         val btnTranslate = rootView.findViewById<TextView>(R.id.btn_gemini_translate)
         val btnFix = rootView.findViewById<TextView>(R.id.btn_gemini_fix)
-        val btnKey = rootView.findViewById<TextView>(R.id.btn_gemini_key)
         val btnGrab = rootView.findViewById<TextView>(R.id.btn_gemini_grab)
         val btnSend = rootView.findViewById<TextView>(R.id.btn_gemini_send)
         val btnClose = rootView.findViewById<TextView>(R.id.btn_gemini_close)
 
         applyMaterialYouStyling(
-            stripRoot, btnOpen, btnTranslate, btnFix, btnKey, activePanel, tvPrompt, btnGrab, btnSend, btnClose
+            stripRoot, btnExpand, btnCollapse, btnOpen, btnTranslate, btnFix,
+            activePanel, tvPrompt, btnGrab, btnSend, btnClose
         )
 
         stripRoot?.isClickable = true
 
+        btnExpand?.setOnClickListener { setCollapsed(false) }
+        btnCollapse?.setOnClickListener { setCollapsed(true) }
         btnOpen?.setOnClickListener { enterGeminiMode() }
         btnClose?.setOnClickListener { exitGeminiMode() }
         btnGrab?.setOnClickListener { grabContextText() }
         btnSend?.setOnClickListener { submitPrompt() }
-
-        btnKey?.setOnClickListener { pasteApiKeyFromClipboard() }
 
         btnTranslate?.setOnClickListener {
             runQuickAction("Terjemahkan teks berikut ke Bahasa Inggris yang natural (jika sudah Bahasa Inggris, terjemahkan ke Bahasa Indonesia):")
@@ -70,6 +79,8 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         btnFix?.setOnClickListener {
             runQuickAction("Perbaiki ejaan dan tata bahasa teks berikut agar rapi dan natural tanpa mengubah maknanya:")
         }
+
+        applyCollapsedState()
     }
 
     fun handleCodeInput(primaryCode: Int): Boolean {
@@ -111,21 +122,44 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         executor.shutdownNow()
     }
 
+    private fun isCollapsedSaved(): Boolean {
+        return ime.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_IS_COLLAPSED, false)
+    }
+
+    private fun setCollapsed(collapsed: Boolean) {
+        ime.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_IS_COLLAPSED, collapsed)
+            .apply()
+        applyCollapsedState()
+    }
+
+    private fun applyCollapsedState() {
+        if (isGeminiMode) return
+        val collapsed = isCollapsedSaved()
+        collapsedBar?.visibility = if (collapsed) View.VISIBLE else View.GONE
+        idleBar?.visibility = if (collapsed) View.GONE else View.VISIBLE
+        activePanel?.visibility = View.GONE
+        stripRoot?.requestLayout()
+    }
+
     private fun enterGeminiMode() {
         isGeminiMode = true
+        collapsedBar?.visibility = View.GONE
         idleBar?.visibility = View.GONE
         suggestionStrip?.visibility = View.GONE
         activePanel?.visibility = View.VISIBLE
         refreshPromptText()
+        stripRoot?.requestLayout()
     }
 
     private fun exitGeminiMode() {
         isGeminiMode = false
         isLoading = false
         promptBuffer.clear()
-        activePanel?.visibility = View.GONE
-        idleBar?.visibility = View.VISIBLE
         suggestionStrip?.visibility = View.VISIBLE
+        applyCollapsedState()
     }
 
     private fun refreshPromptText() {
@@ -181,7 +215,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
 
         val apiKey = getSavedApiKey()
         if (apiKey.isBlank()) {
-            tvPrompt?.text = "API Key belum ada. Tempel AIza... di kolom teks lalu ketuk 🔑"
+            tvPrompt?.text = "API Key kosong. Isi dulu di Pengaturan HeliBoard → Gemini AI"
             return
         }
 
@@ -202,72 +236,20 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         }
     }
 
-    private fun extractApiKey(source: CharSequence?): String? {
-        if (source.isNullOrBlank()) return null
-        return apiKeyRegex.find(source)?.value
-    }
-
-    private fun pasteApiKeyFromClipboard() {
-        val clipText = try {
-            val cm = ime.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val clip = cm?.primaryClip
-            if (clip != null && clip.itemCount > 0) {
-                clip.getItemAt(0)?.coerceToText(ime)?.toString().orEmpty()
-            } else {
-                ""
-            }
-        } catch (_: Exception) {
-            ""
-        }
-
-        val ic = ime.currentInputConnection
-        val selectedText = try { ic?.getSelectedText(0) } catch (_: Exception) { null }
-        val beforeCursorText = try { ic?.getTextBeforeCursor(300, 0) } catch (_: Exception) { null }
-
-        val foundKey = extractApiKey(clipText)
-            ?: extractApiKey(selectedText)
-            ?: extractApiKey(beforeCursorText)
-            ?: extractApiKey(promptBuffer)
-
-        if (foundKey != null) {
-            ime.getSharedPreferences("gemini_heliboard", Context.MODE_PRIVATE)
-                .edit()
-                .putString("api_key", foundKey)
-                .apply()
-            val masked = foundKey.take(6) + "..." + foundKey.takeLast(4)
-            Toast.makeText(ime, "API Key Gemini tersimpan! ($masked)", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val existingKey = getSavedApiKey()
-        if (existingKey.startsWith("AIza") && existingKey.length > 20) {
-            val masked = existingKey.take(6) + "..." + existingKey.takeLast(4)
-            Toast.makeText(
-                ime,
-                "API Key aktif: $masked. Untuk ganti, tempel kunci baru di kolom teks lalu ketuk 🔑",
-                Toast.LENGTH_LONG
-            ).show()
-        } else {
-            Toast.makeText(
-                ime,
-                "Kunci AIza... tidak terbaca. Tempel API Key di kolom teks/catatan dulu, lalu ketuk 🔑",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
     private fun getSavedApiKey(): String {
-        return ime.getSharedPreferences("gemini_heliboard", Context.MODE_PRIVATE)
-            .getString("api_key", "")
+        return ime.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_API_KEY, "")
             .orEmpty()
+            .trim()
     }
 
     private fun applyMaterialYouStyling(
         stripRoot: View?,
+        btnExpand: TextView?,
+        btnCollapse: TextView?,
         btnOpen: TextView?,
         btnTranslate: TextView?,
         btnFix: TextView?,
-        btnKey: TextView?,
         activePanel: LinearLayout?,
         tvPrompt: TextView?,
         btnGrab: TextView?,
@@ -308,7 +290,10 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         btnOpen?.background = createPillDrawable(chipBgColor, accentColor)
         btnOpen?.setTextColor(textColor)
 
-        listOf(btnTranslate, btnFix, btnKey, btnGrab).forEach { view ->
+        btnExpand?.background = createPillDrawable(chipBgColor, accentColor)
+        btnExpand?.setTextColor(textColor)
+
+        listOf(btnTranslate, btnFix, btnCollapse, btnGrab).forEach { view ->
             view?.background = createPillDrawable(chipBgColor, Color.TRANSPARENT)
             view?.setTextColor(textColor)
         }
