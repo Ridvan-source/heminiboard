@@ -35,6 +35,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     private var suggestionStrip: View? = null
 
     fun attachToInputView(rootView: View) {
+        val stripRoot = rootView.findViewById<View>(R.id.gemini_strip_root)
         idleBar = rootView.findViewById(R.id.gemini_idle_bar)
         activePanel = rootView.findViewById(R.id.gemini_active_panel)
         tvPrompt = rootView.findViewById(R.id.tv_gemini_prompt)
@@ -49,8 +50,10 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         val btnClose = rootView.findViewById<TextView>(R.id.btn_gemini_close)
 
         applyMaterialYouStyling(
-            btnOpen, btnTranslate, btnFix, btnKey, activePanel, tvPrompt, btnGrab, btnSend, btnClose
+            stripRoot, btnOpen, btnTranslate, btnFix, btnKey, activePanel, tvPrompt, btnGrab, btnSend, btnClose
         )
+
+        stripRoot?.isClickable = true
 
         btnOpen?.setOnClickListener { enterGeminiMode() }
         btnClose?.setOnClickListener { exitGeminiMode() }
@@ -218,6 +221,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     }
 
     private fun applyMaterialYouStyling(
+        stripRoot: View?,
         btnOpen: TextView?,
         btnTranslate: TextView?,
         btnFix: TextView?,
@@ -230,6 +234,15 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     ) {
         val isDark = (ime.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
                 Configuration.UI_MODE_NIGHT_YES
+
+        val stripBgColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.getColor(
+                ime,
+                if (isDark) android.R.color.system_neutral1_900 else android.R.color.system_neutral1_50
+            )
+        } else {
+            if (isDark) Color.parseColor("#1F2225") else Color.parseColor("#F1F3F4")
+        }
 
         val accentColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ContextCompat.getColor(ime, android.R.color.system_accent1_600)
@@ -247,6 +260,8 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         }
 
         val textColor = if (isDark) Color.parseColor("#F1F3F4") else Color.parseColor("#1F1F1F")
+
+        stripRoot?.setBackgroundColor(stripBgColor)
 
         btnOpen?.background = createPillDrawable(chipBgColor, accentColor)
         btnOpen?.setTextColor(textColor)
