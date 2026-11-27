@@ -50,7 +50,7 @@
             style="?attr/suggestionWordStyle" />
 
         <ImageButton
-            android:id="@+id/btn_switch_one_handed_key"
+            android:id="@+id/btn_switch_one_handed_mode"
             android:contentDescription="@string/label_switch_onehanded_key"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
