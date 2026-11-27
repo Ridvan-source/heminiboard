@@ -24,6 +24,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val promptBuffer = StringBuilder()
+    private val apiKeyRegex = Regex("AIza[0-9A-Za-z_\\-]{20,}")
 
     var isGeminiMode: Boolean = false
         private set
@@ -179,6 +180,11 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         }
 
         val apiKey = getSavedApiKey()
+        if (apiKey.isBlank()) {
+            tvPrompt?.text = "API Key belum ada. Tempel AIza... di kolom teks lalu ketuk 🔑"
+            return
+        }
+
         isLoading = true
         tvPrompt?.text = "✨ Gemini sedang menyusun jawaban..."
 
@@ -196,19 +202,55 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         }
     }
 
+    private fun extractApiKey(source: CharSequence?): String? {
+        if (source.isNullOrBlank()) return null
+        return apiKeyRegex.find(source)?.value
+    }
+
     private fun pasteApiKeyFromClipboard() {
-        val cm = ime.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-        val clipText = cm?.primaryClip?.getItemAt(0)?.coerceToText(ime)?.toString()?.trim().orEmpty()
-        if (clipText.startsWith("AIza") && clipText.length > 20) {
+        val clipText = try {
+            val cm = ime.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = cm?.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                clip.getItemAt(0)?.coerceToText(ime)?.toString().orEmpty()
+            } else {
+                ""
+            }
+        } catch (_: Exception) {
+            ""
+        }
+
+        val ic = ime.currentInputConnection
+        val selectedText = try { ic?.getSelectedText(0) } catch (_: Exception) { null }
+        val beforeCursorText = try { ic?.getTextBeforeCursor(300, 0) } catch (_: Exception) { null }
+
+        val foundKey = extractApiKey(clipText)
+            ?: extractApiKey(selectedText)
+            ?: extractApiKey(beforeCursorText)
+            ?: extractApiKey(promptBuffer)
+
+        if (foundKey != null) {
             ime.getSharedPreferences("gemini_heliboard", Context.MODE_PRIVATE)
                 .edit()
-                .putString("api_key", clipText)
+                .putString("api_key", foundKey)
                 .apply()
-            Toast.makeText(ime, "API Key Gemini berhasil disimpan!", Toast.LENGTH_SHORT).show()
+            val masked = foundKey.take(6) + "..." + foundKey.takeLast(4)
+            Toast.makeText(ime, "API Key Gemini tersimpan! ($masked)", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val existingKey = getSavedApiKey()
+        if (existingKey.startsWith("AIza") && existingKey.length > 20) {
+            val masked = existingKey.take(6) + "..." + existingKey.takeLast(4)
+            Toast.makeText(
+                ime,
+                "API Key aktif: $masked. Untuk ganti, tempel kunci baru di kolom teks lalu ketuk 🔑",
+                Toast.LENGTH_LONG
+            ).show()
         } else {
             Toast.makeText(
                 ime,
-                "Salin API Key (AIza...) dulu ke clipboard, lalu ketuk ikon 🔑 lagi",
+                "Kunci AIza... tidak terbaca. Tempel API Key di kolom teks/catatan dulu, lalu ketuk 🔑",
                 Toast.LENGTH_LONG
             ).show()
         }
