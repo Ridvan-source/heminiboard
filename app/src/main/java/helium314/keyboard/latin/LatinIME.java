@@ -119,7 +119,9 @@ public class LatinIME extends InputMethodService implements
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
     private SuggestionStripView mSuggestionStripView;
     private GeminiOverlayController mGeminiController;
-
+private SuggestionStripView mSuggestionStripView;
+    private GeminiOverlayController mGeminiController;
+    private View mGeminiStripRoot;
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
     private final SubtypeState mSubtypeState = new SubtypeState((InputMethodSubtype subtype) -> { switchToSubtype(subtype); return Unit.INSTANCE; });
@@ -663,23 +665,10 @@ public class LatinIME extends InputMethodService implements
         super.onConfigurationChanged(conf);
     }
 
-    @Override
-    public void onInitializeInterface() {
-        mDisplayContext = KtxKt.getDisplayContext(this);
-        Log.d(TAG, "onInitializeInterface");
-        mKeyboardSwitcher.updateKeyboardTheme(mDisplayContext);
-    }
-
-    @Override
+   @Override
     public View onCreateInputView() {
         StatsUtils.onCreateInputView();
-        final View view = mKeyboardSwitcher.onCreateInputView(KtxKt.getDisplayContext(this), mIsHardwareAcceleratedDrawingEnabled);
-        if (mGeminiController != null) {
-            mGeminiController.shutdown();
-        }
-        mGeminiController = new GeminiOverlayController(this);
-        mGeminiController.attachToInputView(view);
-        return view;
+        return mKeyboardSwitcher.onCreateInputView(KtxKt.getDisplayContext(this), mIsHardwareAcceleratedDrawingEnabled);
     }
 
     @Override
@@ -688,6 +677,13 @@ public class LatinIME extends InputMethodService implements
         // updateSoftInputWindowLayoutParameters needs to happen after setInputView
         mKeyboardSwitcher.updateSoftInputWindowLayoutParameters();
         updateSuggestionStripView(view);
+        mGeminiStripRoot = view != null ? view.findViewById(R.id.gemini_strip_root) : null;
+        if (view != null) {
+            if (mGeminiController == null) {
+                mGeminiController = new GeminiOverlayController(this);
+            }
+            mGeminiController.attachToInputView(view);
+        }
     }
 
     public void updateSuggestionStripView(View view) {
@@ -1090,6 +1086,25 @@ public class LatinIME extends InputMethodService implements
     public void onComputeInsets(InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
         mKeyboardSwitcher.updateInsets(outInsets);
+        if (mGeminiStripRoot != null && mGeminiStripRoot.getVisibility() == View.VISIBLE) {
+            final int geminiHeight = mGeminiStripRoot.getHeight();
+            final int geminiWidth = mGeminiStripRoot.getWidth();
+            if (geminiHeight > 0 && geminiWidth > 0) {
+                final int[] loc = new int[2];
+                mGeminiStripRoot.getLocationInWindow(loc);
+                final int geminiTop = loc[1];
+                if (!isFullscreenMode() && geminiTop < outInsets.contentTopInsets) {
+                    outInsets.contentTopInsets = geminiTop;
+                }
+                if (geminiTop < outInsets.visibleTopInsets) {
+                    outInsets.visibleTopInsets = geminiTop;
+                }
+                if (outInsets.touchableInsets == InputMethodService.Insets.TOUCHABLE_INSETS_REGION) {
+                    outInsets.touchableRegion.union(new android.graphics.Rect(
+                            loc[0], geminiTop, loc[0] + geminiWidth, geminiTop + geminiHeight));
+                }
+            }
+        }
     }
 
     public void startShowingInputView(final boolean needsToLoadKeyboard) {
