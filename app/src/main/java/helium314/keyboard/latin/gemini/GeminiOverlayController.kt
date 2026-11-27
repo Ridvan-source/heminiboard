@@ -1,6 +1,7 @@
 package helium314.keyboard.latin.gemini
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -23,6 +24,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     companion object {
         const val PREFS_NAME = "gemini_heliboard"
         const val KEY_API_KEY = "api_key"
+        const val KEY_STRIP_ENABLED = "strip_enabled"
         const val KEY_IS_COLLAPSED = "is_collapsed"
     }
 
@@ -40,6 +42,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     private var activePanel: LinearLayout? = null
     private var tvPrompt: TextView? = null
     private var suggestionStrip: View? = null
+    private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     fun attachToInputView(rootView: View) {
         stripRoot = rootView.findViewById(R.id.gemini_strip_root)
@@ -80,7 +83,14 @@ class GeminiOverlayController(private val ime: InputMethodService) {
             runQuickAction("Perbaiki ejaan dan tata bahasa teks berikut agar rapi dan natural tanpa mengubah maknanya:")
         }
 
-        applyCollapsedState()
+        val prefs = ime.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefsListener?.let { prefs.unregisterOnSharedPreferenceChangeListener(it) }
+        prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            mainHandler.post { applyVisibilityState() }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+
+        applyVisibilityState()
     }
 
     fun handleCodeInput(primaryCode: Int): Boolean {
@@ -119,7 +129,15 @@ class GeminiOverlayController(private val ime: InputMethodService) {
     }
 
     fun shutdown() {
+        val prefs = ime.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefsListener?.let { prefs.unregisterOnSharedPreferenceChangeListener(it) }
+        prefsListener = null
         executor.shutdownNow()
+    }
+
+    private fun isStripEnabled(): Boolean {
+        return ime.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_STRIP_ENABLED, true)
     }
 
     private fun isCollapsedSaved(): Boolean {
@@ -132,11 +150,25 @@ class GeminiOverlayController(private val ime: InputMethodService) {
             .edit()
             .putBoolean(KEY_IS_COLLAPSED, collapsed)
             .apply()
-        applyCollapsedState()
+        applyVisibilityState()
     }
 
-    private fun applyCollapsedState() {
+    private fun applyVisibilityState() {
+        if (!isStripEnabled()) {
+            if (isGeminiMode) {
+                isGeminiMode = false
+                isLoading = false
+                promptBuffer.clear()
+                suggestionStrip?.visibility = View.VISIBLE
+            }
+            stripRoot?.visibility = View.GONE
+            stripRoot?.requestLayout()
+            return
+        }
+
+        stripRoot?.visibility = View.VISIBLE
         if (isGeminiMode) return
+
         val collapsed = isCollapsedSaved()
         collapsedBar?.visibility = if (collapsed) View.VISIBLE else View.GONE
         idleBar?.visibility = if (collapsed) View.GONE else View.VISIBLE
@@ -159,7 +191,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
         isLoading = false
         promptBuffer.clear()
         suggestionStrip?.visibility = View.VISIBLE
-        applyCollapsedState()
+        applyVisibilityState()
     }
 
     private fun refreshPromptText() {
@@ -215,7 +247,7 @@ class GeminiOverlayController(private val ime: InputMethodService) {
 
         val apiKey = getSavedApiKey()
         if (apiKey.isBlank()) {
-            tvPrompt?.text = "API Key kosong. Isi dulu di Pengaturan HeliBoard → Gemini AI"
+            tvPrompt?.text = "API Key kosong. Isi dulu di Pengaturan HeliBoard → ✨ Gemini AI"
             return
         }
 
