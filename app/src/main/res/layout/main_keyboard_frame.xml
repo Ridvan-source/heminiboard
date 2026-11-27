@@ -12,6 +12,8 @@
     android:layout_gravity="bottom"
     android:orientation="vertical" >
 
+    <include layout="@layout/gemini_strip" />
+
     <include
         android:id="@+id/strip_container"
         layout="@layout/strip_container" />
@@ -48,7 +50,7 @@
             style="?attr/suggestionWordStyle" />
 
         <ImageButton
-            android:id="@+id/btn_switch_one_handed_mode"
+            android:id="@+id/btn_switch_one_handed_key"
             android:contentDescription="@string/label_switch_onehanded_key"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
